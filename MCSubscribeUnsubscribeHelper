@@ -1,0 +1,76 @@
+public class MCSubscribeUnsubscribeHelper {
+	
+     @future(callout=true) // make callout in future method
+      //Future mehtod called by trigger to subscribe/unsubscribe the member from mailchimp list.
+    public static void doSubscribeUnsubscribe(Set<string> conEmail){ //
+         //Get member ids in MD5 format
+                map<string,string> emailMemberIdMap=new map<string,string>();
+        		map<string,boolean> emailBolMap = new map<string,boolean>();
+                for(string str:conEmail){ // iterate over set of email ids.
+                    String emailStr = str.substringBefore('|');
+                    //email into blob
+                    Blob targetBlob = Blob.valueOf(emailStr);
+                    Blob hash = Crypto.generateDigest('MD5', targetBlob);
+                    String requestSignature = EncodingUtil.convertToHex(hash);
+                    system.debug('MD5 '+requestSignature);
+                    Boolean bool = Boolean.valueOf(str.substringAfter('|'));
+                    emailBolMap.put(emailStr, bool);
+                    emailMemberIdMap.put(emailStr,requestSignature);
+                }
+                
+                
+                string api_Key = 'ee6c451ec8c6057034568e7435dbxxxx-usxx'; // put your actual Mailchimp API key
+                String mailChimpListId = 'f37ef2xxxx'; // put your Mailchimp list id
+                Http h = new Http();
+                HttpRequest req = new HttpRequest();
+                string endPointValue ='https://usxx.api.mailchimp.com/3.0/batches'; // replace usxx = your mailchimp datacenter name
+                req.setEndpoint(endPointValue);
+                req.setHeader('Authorization', 'apikey '+api_Key);
+                req.setHeader('content-type', 'application/json');
+                //req.setHeader('X-HTTP-Method-Override','PATCH');
+                req.setMethod('POST');
+                
+                string requestBody;
+                JSONGenerator gen = JSON.createGenerator(true);
+                gen.writeStartObject();
+                gen.writeFieldName('operations');
+                //Start Array
+                gen.writeStartArray();
+                for(string str:emailMemberIdMap.keyset()){
+                        
+                        system.debug('Email: '+str);
+                        system.debug('Member Id: '+emailMemberIdMap.get(str));
+                        //Start object
+                        gen.writeStartObject();
+                        gen.writeStringField('method','PUT');
+                        gen.writeStringField('path','lists/'+mailChimpListId+'/members/'+emailMemberIdMap.get(str));
+                        string stringBody;
+                        
+                        if(emailBolMap.get(str)==true){
+                             stringBody='{\"email_address\":\"'+str+'\",\"status\":\"subscribed\"}'; //JSON string for subscribe
+                        }else{
+                            stringBody='{\"email_address\":\"'+str+'\",\"status\":\"unsubscribed\"}'; //JSON string for unsubscribe
+                        }
+                        gen.writeStringField('body',stringBody);
+                        //End object
+                        gen.writeEndObject();
+                        //end object
+                }
+                //End Array
+                gen.writeEndArray();
+                //End Object
+                gen.writeEndObject();
+                String jsonBody = gen.getAsString();
+                system.debug('Json string: #### '+jsonBody );
+                req.setBody(jsonBody);
+                HttpResponse res;
+                try{
+                    //send request
+                    res = h.send(req);
+                }
+                catch(Exception e){
+                    system.debug('Exception has Occured !'+ e.getMessage());
+                }
+                system.debug('response returned: '+res.getBody());
+    }
+}
