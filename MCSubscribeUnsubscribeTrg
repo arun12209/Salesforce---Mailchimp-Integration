@@ -1,0 +1,31 @@
+/* Name:MCSubscribeUnsubscribeTrg
+* Description: On contact record insert/update subscribe/unsubscribe member in Mailchimp list.
+* Created Date: 05/05/2019
+* Last ModifiedDate : 05/05/2019
+* Created By: Arun Kumar
+*/
+trigger MCSubscribeUnsubscribeTrg on Contact (after insert, after update) {
+    
+    if(trigger.isAfter && trigger.isUpdate){
+        system.debug('Contact Email has Opted Out: ');
+        set<string> contactEmailSet=new set<string>();
+        
+        for(contact co:trigger.new){
+            if(co.HasOptedOutOfEmail==true && co.email!=null){
+                contactEmailSet.add(co.email+'|false');
+            }
+            if(co.HasOptedOutOfEmail==false && co.email!=null){
+                contactEmailSet.add(co.email+'|true');
+            }
+        }
+        system.debug('Contact Email has Opted Out: '+contactEmailSet);
+        if(contactEmailSet.size()>0){
+            if (System.isFuture() || System.isBatch()){ // If Trigger initiated through future and Batch Process, 
+                
+            }    
+            else{
+                MCSubscribeUnsubscribeHelper.doSubscribeUnsubscribe(contactEmailSet);
+            }
+        }
+    }
+}
